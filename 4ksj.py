@@ -6,8 +6,9 @@ import time
 from urllib.parse import urlencode
 
 # global variables
-uname = '**********'         # username，需要修改
-upassword = '**********'     # password，需要修改
+uname = '******'                # username，需要修改成自己的登录用户名！！！！
+upassword = '******'            # password，需要修改成自己的密码！！！！！！！
+sever_jiang_send_key = ''       # server酱的send_key,如需短信通知功能，可填写此项；如果不需要通知，可以留空''
 loginhash = ''
 formhash = ''
 r = httpx.Client(http2=True)
@@ -24,6 +25,29 @@ headers = {'Host':'www.4ksj.com',
 'Te':'trailers'
 }
 
+#以下是使用server酱通知的函数（抄来的，哈哈）
+def serverJ(title: str, content: str) -> None:
+    """
+    通过 server酱 推送消息。
+    """
+    if sever_jiang_send_key == '':
+        print("serverJ 服务的 send_KEY 未设置!!\n取消推送")
+        return
+    print("serverJ 服务启动")
+
+    data = {"text": title, "desp": content.replace("\n", "\n\n")}
+    if sever_jiang_send_key.find("SCT") != -1:
+        url = f'https://sctapi.ftqq.com/{sever_jiang_send_key}.send'
+    else:
+        url = f'https://sc.ftqq.com/{sever_jiang_send_key}.send'
+    response = r.post(url, data=data).json()
+
+    if response.get("errno") == 0 or response.get("code") == 0:
+        print("serverJ 推送成功！")
+    else:
+        print(f'serverJ 推送失败！错误码：{response["message"]}')
+
+
 #从个人空间页面获取当前K值
 def getK(spaceurl):
     ret = r.get(spaceurl, headers = headers).text
@@ -34,13 +58,15 @@ def getK(spaceurl):
 
 #登录网站，并获取个人空间入口
 def login(uname, upassword):
+    #进入登录页面获取formhash和loginhash
     headers['Referer'] = 'https://www.4ksj.com/'
     ret = r.get(r'https://www.4ksj.com/member.php?mod=logging&action=login', headers=headers).text
     time.sleep(1)
     formhash = re.findall(r'<input type="hidden" name="formhash" value="(.*?)"', ret)[0]
-    print('获取到登录页formhash: ' + formhash)
+    print('准备登录，获取到登录页formhash: ' + formhash)
     loginhash = re.findall(r'loginhash=(.*?)"', ret)[0]
-    print("获取到登录页loginhash:"+loginhash)
+    print("准备登陆，获取到登录页loginhash:"+loginhash)
+    #进行登录
     headers['Origin'] = 'https://www.4ksj.com'
     headers['Referer'] = 'https://www.4ksj.com/member.php?mod=logging&action=login'
     headers['Sec-Fetch-Dest'] = 'iframe'
@@ -51,9 +77,11 @@ def login(uname, upassword):
     if 'succeedmessage' in ret:
         print('登录成功')
     else:
+        print('登录失败')
         print(re.findall(r'errorhandle_\(\'(.*?)\', {', ret)[0])
         return False, False
 
+    #重新获取首页信息，找到个人空间入口
     del headers['Origin']
     del headers['Content-Type']
     headers['Sec-Fetch-Dest'] = 'document'
@@ -62,7 +90,7 @@ def login(uname, upassword):
     spaceurl = ""
     userid = re.findall(r'discuz_uid = \'(.*?)\'', ret)[0]
     spaceurl = "https://www.4ksj.com/space-uid-"+userid+".html"
-    print("个人空间入口:"+spaceurl)
+    print("获取到个人空间入口:"+spaceurl)
     return spaceurl
 
 #进行签到
@@ -71,7 +99,7 @@ def qiandao():
     ret = r.get('https://www.4ksj.com/qiandao/', headers = headers).text
     time.sleep(1)
     formhash = re.findall(r'action=logout&amp;formhash=(.*?)"', ret)[0]
-    print('获取到签到页formhash: ' + formhash)
+    print('准备签到：获取到签到页formhash: ' + formhash)
 
     headers['Referer'] = 'https://www.4ksj.com/qiandao/'
     headers['Sec-Fetch-Dest'] = 'empty'
@@ -96,7 +124,7 @@ def logout(formhash):
 
 
 if __name__ == '__main__':
-    print("4K世界签到开始：")
+    print("开始运行4K世界自动签到脚本：")
     for i in range(3): # 尝试3次
         if i > 0:
             #logger.warn('retrying for ' + str(i) + 'times')
@@ -108,8 +136,10 @@ if __name__ == '__main__':
             #    sys.exit(0) # exit if login failed
             headers['Referer'] = 'https://www.4ksj.com/'
 
+            #获取签到前的K币数量
             k_num1 = getK(spaceurl)
 
+            #开始签到
             qiandao()
 
             headers['Referer'] = 'https://www.4ksj.com/qiandao/'
@@ -119,16 +149,20 @@ if __name__ == '__main__':
             headers['Upgrade-Insecure-Requests'] = '1'
             del headers['X-Requested-With']
             
+            #获取签到后的K币数量
             k_num2 = getK(spaceurl)
 
+            #发送server酱 通知
+            serverJ('4K世界签到：获得'+str(int(k_num2)-int(k_num1))+'个K币', '本次获得K币: ' + str(int(k_num2)-int(k_num1)) + '个\n'+'累计K币: ' + str(int(k_num2)) + '个')
+            
             print('***************结果统计***************')
             #print('之前K币: ' + str(k_num1) + '个')
             print('本次获得K币: ' + str(int(k_num2)-int(k_num1)) + '个')
             print('累计K币: ' + str(int(k_num2)) + '个')
             print('*************************************')
-
+            
+            #退出登录
             logout(formhash)
-
             sys.exit(0)
         except Exception as e:
             print('line: ' + str(e.__traceback__.tb_lineno) + ' ' + repr(e))
