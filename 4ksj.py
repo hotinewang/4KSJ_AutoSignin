@@ -4,11 +4,13 @@ import re
 import sys
 import time
 from urllib.parse import urlencode
+from urllib.parse import quote
 
 # global variables
-uname = '******'                # username，需要修改成自己的登录用户名！！！！
-upassword = '******'            # password，需要修改成自己的密码！！！！！！！
-sever_jiang_send_key = ''       # server酱的send_key,如需短信通知功能，可填写此项；如果不需要通知，可以留空''
+uname = '*******'            # username，需要修改成自己的登录用户名！！！！！！！！！！！！！！！！！！！！
+upassword = '******'         # password，需要修改成自己的密码！！！！！！！！！！！！！！！！！！！！！！！
+sever_jiang_send_key = ''    #server酱的send_key,如需微信通知功能，可填写此项；如果不需要通知，可以留空''
+plusplus_token=''            #plusplus推送加的token，如需通知功能，可填写此项；如果不需要通知，可以留空''
 loginhash = ''
 formhash = ''
 r = httpx.Client(http2=True)
@@ -46,6 +48,16 @@ def serverJ(title: str, content: str) -> None:
         print("serverJ 推送成功！")
     else:
         print(f'serverJ 推送失败！错误码：{response["message"]}')
+        
+#以下是使用plusplus推送加通知的函数       
+def plusplus(title: str, content: str) -> None:
+    if plusplus_token == '':
+        print("plusplus推送加 服务的 token 未设置!!\n取消推送")
+        return
+    url = 'http://www.pushplus.plus/send?token='+plusplus_token+'&title='+quote(title)+'&content='+quote(content)
+    response = r.get(url).text
+    print("plusplus推送加 推送消息,并返回："+response)
+
 
 
 #从个人空间页面获取当前K值
@@ -152,13 +164,18 @@ if __name__ == '__main__':
             #获取签到后的K币数量
             k_num2 = getK(spaceurl)
 
-            #发送server酱 通知
-            serverJ('4K世界签到：获得'+str(int(k_num2)-int(k_num1))+'个K币', '本次获得K币: ' + str(int(k_num2)-int(k_num1)) + '个\n'+'累计K币: ' + str(int(k_num2)) + '个')
+            #发送推送 通知
+            title = '4K世界签到：获得'+str(int(k_num2)-int(k_num1))+'个K币'
+            content = uname+'本次获得K币: ' + str(int(k_num2)-int(k_num1)) + '个\n'+'累计K币: ' + str(int(k_num2)) + '个'
+            #server酱通知
+            serverJ(title,content)
+            #plusplus推送加的通知
+            plusplus(title,content)
             
-            print('***************结果统计***************')
+            
+            print('***************4K世界签到：结果统计***************')
             #print('之前K币: ' + str(k_num1) + '个')
-            print('本次获得K币: ' + str(int(k_num2)-int(k_num1)) + '个')
-            print('累计K币: ' + str(int(k_num2)) + '个')
+            print(content)
             print('*************************************')
             
             #退出登录
